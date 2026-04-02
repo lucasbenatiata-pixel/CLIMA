@@ -2,24 +2,24 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Monitoramento Rural - Modo Home Office</title>
+    <title>Radar Rural - Operação Fuga do Firewall</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; background: #000; color: #eee; font-family: sans-serif; }
+        body { margin: 0; padding: 0; background: #000; font-family: sans-serif; }
         #map { height: 100vh; width: 100%; }
-        .aviso {
+        .status-panel {
             position: absolute; top: 10px; left: 50px; z-index: 1000;
-            background: rgba(0,0,0,0.9); padding: 15px; border-radius: 8px;
-            border: 1px solid #f1c40f; color: #f1c40f; font-size: 12px;
+            background: rgba(0,0,0,0.9); color: #00ff00; padding: 15px;
+            border: 1px solid #00ff00; border-radius: 8px; font-family: monospace;
         }
+        .legend { background: white; padding: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
-<div class="aviso">
-    <b>⚠️ BLOQUEIO DE REDE DETECTADO</b><br>
-    O seu escritório bloqueia sites militares (.mil.br).<br>
-    Tentando radar comercial via porta 443...
+<div class="status-panel">
+    > CONEXÃO: <span id="status">TESTANDO FONTES...</span><br>
+    > FIREWALL: FORTIGUARD DETECTADO
 </div>
 
 <div id="map"></div>
@@ -27,31 +27,43 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    // 1. Mapa centrado no Brasil
+    // 1. Iniciando o Mapa com o único sobrevivente (OSM)
     var map = L.map('map').setView([-15, -55], 4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // 2. Usando OpenStreetMap (Mais chance de estar liberado que o Google Sat)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: 'OSM'
+    // 2. OPÇÃO A: OpenWeatherMap (Domínio comercial comum)
+    // Às vezes o firewall libera por ser "Weather" genérico e não militar.
+    var radarOWM = L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=YOUR_API_KEY', {
+        opacity: 0.7, zIndex: 1000
+    });
+
+    // 3. OPÇÃO B: RainViewer (O que estava bloqueando, mas em link alternativo)
+    var radarRain = L.tileLayer('https://tilecache.rainviewer.com/v2/radar/nowcast_10/256/{z}/{x}/{y}/2/1_1.png', {
+        opacity: 0.6, zIndex: 1001
     }).addTo(map);
 
-    // 3. Radar de Chuva (RainViewer - Fonte Comercial .com)
-    // Usando o link que pega o tempo real de forma "cega"
-    var radarComercial = L.tileLayer('https://tilecache.rainviewer.com/v2/radar/nowcast_5/256/{z}/{x}/{y}/2/1_1.png', {
-        opacity: 0.7,
-        zIndex: 1000
-    }).addTo(map);
+    // 4. OPÇÃO C: Satélite NASA (Tentando via CDN alternativo)
+    var goesNasa = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13/default/{time}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.google', {
+        time: '', opacity: 0.4, zIndex: 500
+    });
 
-    // 4. Carregar Fazendas
+    // 5. SELETOR DE CAMADAS (Para você testar uma por uma)
+    var overlays = {
+        "Chuva (RainViewer)": radarRain,
+        "Chuva (OpenWeather)": radarOWM,
+        "Nuvens (NASA GOES)": goesNasa
+    };
+    L.control.layers({}, overlays, {collapsed: false}).addTo(map);
+
+    // 6. Carregar Fazendas
     fetch('fazendas.json')
         .then(res => res.json())
         .then(data => {
-            var f = L.geoJSON(data, {
-                style: { color: "#2ecc71", weight: 3, fillOpacity: 0.2 }
-            }).addTo(map);
+            var f = L.geoJSON(data, { style: { color: "#ff00ff", weight: 3, fillOpacity: 0.1 } }).addTo(map);
             map.fitBounds(f.getBounds());
+            document.getElementById('status').innerText = "ONLINE (GITHUB PAGES)";
         })
-        .catch(() => { console.log("Erro no JSON local"); });
+        .catch(() => { document.getElementById('status').innerText = "JSON LOCAL BLOQUEADO?"; });
 
 </script>
 </body>
