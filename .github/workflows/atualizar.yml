@@ -7,15 +7,21 @@ on:
 jobs:
   download:
     runs-on: ubuntu-latest
-    permissions: # ISSO AQUI garante a permissão via código também
+    permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4 # Versão 4 é a mais atualizada
+      - uses: actions/checkout@v4
       
-      - name: Baixando Imagem
-        run: |
-          # O link do RainViewer às vezes precisa de um "disfarce" (User-Agent)
-          curl -L -A "Mozilla/5.0" "https://tilecache.rainviewer.com/v2/radar/nowcast_5/256/1/1/1/2/1_1.png" -o radar.png
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Instalar Dependencias
+        run: pip install requests
+        
+      - name: Rodar Script de Download
+        run: python baixar_radar.py
           
       - name: Salvar no Repositório
         run: |
