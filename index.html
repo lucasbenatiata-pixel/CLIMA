@@ -2,23 +2,25 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Centro de Comando Rural - GitHub Edition</title>
+    <title>Radar Real-Time - Estável</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; background: #001; font-family: sans-serif; }
+        body { margin: 0; padding: 0; background: #000; }
         #map { height: 100vh; width: 100%; }
-        .control-panel {
+        .painel {
             position: absolute; top: 10px; left: 50px; z-index: 1000;
-            background: rgba(0,0,0,0.85); color: #00ff00;
-            padding: 15px; border-radius: 8px; border: 1px solid #00ff00;
+            background: rgba(0,0,0,0.9); color: #00ff00;
+            padding: 10px; border-radius: 5px; font-family: monospace;
+            border: 1px solid #00ff00; font-size: 12px;
         }
     </style>
 </head>
 <body>
 
-<div class="control-panel">
-    <h3 style="margin:0">CONTROLE DE SAFRA</h3>
-    <div id="status">Sincronizando sistemas...</div>
+<div class="painel">
+    > SISTEMA ONLINE (GITHUB PAGES)<br>
+    > MODO: SEM SINCRONIZAÇÃO (FORÇA BRUTA)<br>
+    > CAMADAS: GOES-16 + RADAR AGORA
 </div>
 
 <div id="map"></div>
@@ -26,68 +28,52 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    // 1. Configurações Iniciais do Mapa
-    const map = L.map('map').setView([-15, -55], 4);
+    // 1. Mapa centrado no Brasil
+    var map = L.map('map').setView([-15, -55], 4);
 
-    // 2. Mapas de Fundo (Base Layers)
-    const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { attribution: 'Google' });
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-    googleSat.addTo(map); // Satélite por padrão
+    // 2. Fundo Satélite (Google) - SEMPRE funciona
+    var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        attribution: 'Google'
+    }).addTo(map);
 
-    // 3. CAMADA NASA GOES-16 (Infravermelho - Nuvens)
-    const nasaGoes = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13/default/{time}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.google', {
-        time: '', opacity: 0.5, zIndex: 10
-    });
+    // 3. Camada de CHUVA (RainViewer - Link Estático "Nowcast")
+    // Este link pega os dados mais recentes SEM precisar consultar API. 
+    // O 'nowcast_10' é o código para os últimos 10 minutos.
+    var camadaChuva = L.tileLayer('https://tilecache.rainviewer.com/v2/radar/nowcast_10/256/{z}/{x}/{y}/2/1_1.png', {
+        opacity: 0.7,
+        zIndex: 1000
+    }).addTo(map);
 
-    // 4. CAMADA RADAR GLOBAL (RainViewer)
-    // Criamos um grupo de camadas para o radar
-    const radarLayerGroup = L.layerGroup();
-    
-    async function updateRadar() {
-        try {
-            const resp = await fetch('https://api.rainviewer.com/public/weather-maps.json');
-            const data = await resp.json();
-            const ts = data.radar.past[data.radar.past.length - 1].time;
-            
-            radarLayerGroup.clearLayers();
-            L.tileLayer(`https://tilecache.rainviewer.com/v2/radar/${ts}/256/{z}/{x}/{y}/2/1_1.png`, {
-                opacity: 0.7, zIndex: 20
-            }).addTo(radarLayerGroup);
-            
-            document.getElementById('status').innerText = "Radar & GOES-16: Operacionais";
-        } catch (e) {
-            document.getElementById('status').innerText = "Erro na sincronização do Radar";
-        }
-    }
-    updateRadar();
-    radarLayerGroup.addTo(map);
+    // 4. Camada NASA GOES-16 (Nuvens em tempo real)
+    var camadaNasa = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13/default/{time}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.google', {
+        time: '',
+        opacity: 0.4,
+        zIndex: 500
+    }).addTo(map);
 
-    // 5. CARREGAR SUAS FAZENDAS (Agora via Fetch real)
+    // 5. Carregar Fazendas (Verifique se o nome do arquivo no GitHub é exatamente fazendas.json)
     fetch('fazendas.json')
-        .then(response => response.json())
-        .then(data => {
-            const fazendasLayer = L.geoJSON(data, {
-                style: { color: "#39ff14", weight: 3, fillOpacity: 0.2 },
-                onEachFeature: (feature, layer) => {
-                    layer.bindPopup(`<b>Fazenda:</b> ${feature.properties.nome || 'Área Registrada'}`);
-                }
-            }).addTo(map);
-            map.fitBounds(fazendasLayer.getBounds());
+        .then(response => {
+            if (!response.ok) throw new Error("Arquivo fazendas.json não encontrado no servidor.");
+            return response.json();
         })
-        .catch(err => console.error("Erro ao carregar fazendas.json:", err));
+        .then(data => {
+            var f = L.geoJSON(data, {
+                style: { color: "#39ff14", weight: 2, fillOpacity: 0.2 }
+            }).addTo(map);
+            map.fitBounds(f.getBounds());
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Erro ao carregar fazendas.json. Verifique se o arquivo está na raiz do GitHub.");
+        });
 
-    // 6. SELETOR DE CAMADAS (A Mágica das Opções)
-    const baseMaps = {
-        "Visão Satélite": googleSat,
-        "Visão Mapa": osm
+    // 6. Seletor de Camadas (Canto Superior Direito)
+    var overlays = {
+        "Chuva (Radar)": camadaChuva,
+        "Nuvens (GOES-16 NASA)": camadaNasa
     };
-
-    const overlayMaps = {
-        "Radar de Chuva": radarLayerGroup,
-        "Nuvens GOES-16 (NASA)": nasaGoes
-    };
-
-    L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+    L.control.layers({}, overlays, {collapsed: false}).addTo(map);
 
 </script>
 </body>
