@@ -1,70 +1,33 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>Radar Rural - Operação Fuga do Firewall</title>
+    <title>Mapa de Fazendas - Anti-Firewall</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body { margin: 0; padding: 0; background: #000; font-family: sans-serif; }
-        #map { height: 100vh; width: 100%; }
-        .status-panel {
-            position: absolute; top: 10px; left: 50px; z-index: 1000;
-            background: rgba(0,0,0,0.9); color: #00ff00; padding: 15px;
-            border: 1px solid #00ff00; border-radius: 8px; font-family: monospace;
-        }
-        .legend { background: white; padding: 10px; border-radius: 5px; }
-    </style>
+    <style>#map { height: 100vh; width: 100%; background: #000; }</style>
 </head>
 <body>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([-15, -55], 4);
+        
+        // Fundo que o FortiGuard libera
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-<div class="status-panel">
-    > CONEXÃO: <span id="status">TESTANDO FONTES...</span><br>
-    > FIREWALL: FORTIGUARD DETECTADO
-</div>
+        // SOBREPOSIÇÃO DA CHUVA (A imagem que o robô baixou)
+        // Coordenadas aproximadas para cobrir o Brasil com a imagem do radar
+        var limitesBrasil = [[5.2, -73.9], [-33.7, -32.3]];
+        L.imageOverlay('radar.png', limitesBrasil, { opacity: 0.6 }).addTo(map);
 
-<div id="map"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script>
-    // 1. Iniciando o Mapa com o único sobrevivente (OSM)
-    var map = L.map('map').setView([-15, -55], 4);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-    // 2. OPÇÃO A: OpenWeatherMap (Domínio comercial comum)
-    // Às vezes o firewall libera por ser "Weather" genérico e não militar.
-    var radarOWM = L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=YOUR_API_KEY', {
-        opacity: 0.7, zIndex: 1000
-    });
-
-    // 3. OPÇÃO B: RainViewer (O que estava bloqueando, mas em link alternativo)
-    var radarRain = L.tileLayer('https://tilecache.rainviewer.com/v2/radar/nowcast_10/256/{z}/{x}/{y}/2/1_1.png', {
-        opacity: 0.6, zIndex: 1001
-    }).addTo(map);
-
-    // 4. OPÇÃO C: Satélite NASA (Tentando via CDN alternativo)
-    var goesNasa = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13/default/{time}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.google', {
-        time: '', opacity: 0.4, zIndex: 500
-    });
-
-    // 5. SELETOR DE CAMADAS (Para você testar uma por uma)
-    var overlays = {
-        "Chuva (RainViewer)": radarRain,
-        "Chuva (OpenWeather)": radarOWM,
-        "Nuvens (NASA GOES)": goesNasa
-    };
-    L.control.layers({}, overlays, {collapsed: false}).addTo(map);
-
-    // 6. Carregar Fazendas
-    fetch('fazendas.json')
-        .then(res => res.json())
-        .then(data => {
-            var f = L.geoJSON(data, { style: { color: "#ff00ff", weight: 3, fillOpacity: 0.1 } }).addTo(map);
-            map.fitBounds(f.getBounds());
-            document.getElementById('status').innerText = "ONLINE (GITHUB PAGES)";
-        })
-        .catch(() => { document.getElementById('status').innerText = "JSON LOCAL BLOQUEADO?"; });
-
-</script>
+        // CARREGAR FAZENDAS
+        fetch('fazendas.json')
+            .then(res => res.json())
+            .then(data => {
+                L.geoJSON(data, {
+                    style: { color: "#ff0000", weight: 2, fillOpacity: 0.2 }
+                }).addTo(map);
+            });
+    </script>
 </body>
 </html>
