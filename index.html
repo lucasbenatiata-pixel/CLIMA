@@ -2,25 +2,23 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Radar Real-Time - Estável</title>
+    <title>Monitoramento Rural - Estável</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; background: #000; }
         #map { height: 100vh; width: 100%; }
         .painel {
             position: absolute; top: 10px; left: 50px; z-index: 1000;
-            background: rgba(0,0,0,0.9); color: #00ff00;
-            padding: 10px; border-radius: 5px; font-family: monospace;
-            border: 1px solid #00ff00; font-size: 12px;
+            background: rgba(0,0,0,0.85); color: #fff; padding: 12px;
+            border-radius: 5px; border-left: 5px solid #00ff00; font-family: sans-serif;
         }
     </style>
 </head>
 <body>
 
 <div class="painel">
-    > SISTEMA ONLINE (GITHUB PAGES)<br>
-    > MODO: SEM SINCRONIZAÇÃO (FORÇA BRUTA)<br>
-    > CAMADAS: GOES-16 + RADAR AGORA
+    <b>SISTEMA DE MONITORAMENTO</b><br>
+    <small id="status">Carregando dados...</small>
 </div>
 
 <div id="map"></div>
@@ -28,50 +26,58 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    // 1. Mapa centrado no Brasil
+    // 1. Iniciar o Mapa
     var map = L.map('map').setView([-15, -55], 4);
 
-    // 2. Fundo Satélite (Google) - SEMPRE funciona
+    // 2. Camada de Satélite (Google)
     var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
         attribution: 'Google'
     }).addTo(map);
 
-    // 3. Camada de CHUVA (RainViewer - Link Estático "Nowcast")
-    // Este link pega os dados mais recentes SEM precisar consultar API. 
-    // O 'nowcast_10' é o código para os últimos 10 minutos.
-    var camadaChuva = L.tileLayer('https://tilecache.rainviewer.com/v2/radar/nowcast_10/256/{z}/{x}/{y}/2/1_1.png', {
+    // 3. CAMADA NASA (Nuvens GOES-16) - Muito estável
+    var nuvensNasa = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13/default/{time}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.google', {
+        time: '', opacity: 0.5, zIndex: 500
+    }).addTo(map);
+
+    // 4. CAMADA REDEMET (Radar do Brasil - Aeronáutica)
+    var radarBrasil = L.tileLayer.wms("https://redemet.decea.mil.br/geoserver/wms", {
+        layers: 'conveccao:radar_max',
+        format: 'image/png',
+        transparent: true,
         opacity: 0.7,
         zIndex: 1000
     }).addTo(map);
 
-    // 4. Camada NASA GOES-16 (Nuvens em tempo real)
-    var camadaNasa = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13/default/{time}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.google', {
-        time: '',
-        opacity: 0.4,
-        zIndex: 500
-    }).addTo(map);
-
-    // 5. Carregar Fazendas (Verifique se o nome do arquivo no GitHub é exatamente fazendas.json)
+    // 5. CARREGAR FAZENDAS (Com correção para o erro de 'nome')
     fetch('fazendas.json')
-        .then(response => {
-            if (!response.ok) throw new Error("Arquivo fazendas.json não encontrado no servidor.");
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            var f = L.geoJSON(data, {
-                style: { color: "#39ff14", weight: 2, fillOpacity: 0.2 }
+            var camadaFazendas = L.geoJSON(data, {
+                style: { color: "#39ff14", weight: 2, fillOpacity: 0.2 },
+                onEachFeature: function (feature, layer) {
+                    // CORREÇÃO AQUI: Verifica se existe a propriedade antes de ler
+                    var nomeFazenda = "Área Registrada";
+                    if (feature.properties && feature.properties.nome) {
+                        nomeFazenda = feature.properties.nome;
+                    } else if (feature.properties && feature.properties.Name) { // Tenta 'Name' com N maiúsculo
+                        nomeFazenda = feature.properties.Name;
+                    }
+                    layer.bindPopup("<b>" + nomeFazenda + "</b>");
+                }
             }).addTo(map);
-            map.fitBounds(f.getBounds());
+            
+            map.fitBounds(camadaFazendas.getBounds());
+            document.getElementById('status').innerText = "Fazendas e Satélite: OK";
         })
         .catch(err => {
+            document.getElementById('status').innerText = "Erro ao carregar o arquivo .json";
             console.error(err);
-            alert("Erro ao carregar fazendas.json. Verifique se o arquivo está na raiz do GitHub.");
         });
 
-    // 6. Seletor de Camadas (Canto Superior Direito)
+    // Controle de Camadas
     var overlays = {
-        "Chuva (Radar)": camadaChuva,
-        "Nuvens (GOES-16 NASA)": camadaNasa
+        "Nuvens (NASA)": nuvensNasa,
+        "Radar Chuva (REDEMET)": radarBrasil
     };
     L.control.layers({}, overlays, {collapsed: false}).addTo(map);
 
