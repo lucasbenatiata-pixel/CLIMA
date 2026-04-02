@@ -2,24 +2,24 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Radar Rural - Sistema de Elite</title>
+    <title>Monitoramento Rural - Modo Home Office</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; background: #010101; font-family: sans-serif; }
+        body { margin: 0; padding: 0; background: #000; color: #eee; font-family: sans-serif; }
         #map { height: 100vh; width: 100%; }
-        .painel {
+        .aviso {
             position: absolute; top: 10px; left: 50px; z-index: 1000;
-            background: rgba(0,0,0,0.9); color: #00ff00; padding: 15px;
-            border-radius: 5px; border: 1px solid #00ff00; font-family: monospace;
+            background: rgba(0,0,0,0.9); padding: 15px; border-radius: 8px;
+            border: 1px solid #f1c40f; color: #f1c40f; font-size: 12px;
         }
     </style>
 </head>
 <body>
 
-<div class="painel">
-    > STATUS: CONEXÃO SEGURA NASA/REDEMET<br>
-    > MODO: ANTI-BLOQUEIO ATIVADO<br>
-    <small id="status">Sincronizando satélites...</small>
+<div class="aviso">
+    <b>⚠️ BLOQUEIO DE REDE DETECTADO</b><br>
+    O seu escritório bloqueia sites militares (.mil.br).<br>
+    Tentando radar comercial via porta 443...
 </div>
 
 <div id="map"></div>
@@ -27,59 +27,31 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    // 1. Iniciando o Mapa no Brasil
+    // 1. Mapa centrado no Brasil
     var map = L.map('map').setView([-15, -55], 4);
 
-    // 2. Fundo Satélite (Google) - Esse raramente bloqueia
-    var googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-        attribution: 'Google Sat'
+    // 2. Usando OpenStreetMap (Mais chance de estar liberado que o Google Sat)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'OSM'
     }).addTo(map);
 
-    // 3. CAMADA NASA GOES-16 (O olho que tudo vê)
-    // Esse servidor da NASA (GIBS) é o mais confiável do mundo.
-    var nuvensNasa = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13/default/{time}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.google', {
-        time: '', 
-        opacity: 0.5, 
-        zIndex: 500,
-        attribution: 'NASA GIBS'
+    // 3. Radar de Chuva (RainViewer - Fonte Comercial .com)
+    // Usando o link que pega o tempo real de forma "cega"
+    var radarComercial = L.tileLayer('https://tilecache.rainviewer.com/v2/radar/nowcast_5/256/{z}/{x}/{y}/2/1_1.png', {
+        opacity: 0.7,
+        zIndex: 1000
     }).addTo(map);
 
-    // 4. CAMADA REDEMET (Radar de Chuva oficial do Brasil - WMS)
-    var radarBrasil = L.tileLayer.wms("https://redemet.decea.mil.br/geoserver/wms", {
-        layers: 'conveccao:radar_max',
-        format: 'image/png',
-        transparent: true,
-        opacity: 0.8,
-        zIndex: 1000,
-        attribution: "REDEMET"
-    }).addTo(map);
-
-    // 5. CARREGAR FAZENDAS (Com proteção para erros de dados)
+    // 4. Carregar Fazendas
     fetch('fazendas.json')
-        .then(response => response.json())
+        .then(res => res.json())
         .then(data => {
-            var camadaFazendas = L.geoJSON(data, {
-                style: { color: "#39ff14", weight: 3, fillOpacity: 0.2 },
-                onEachFeature: function (feature, layer) {
-                    var n = (feature.properties && (feature.properties.nome || feature.properties.Name)) || "Área Rural";
-                    layer.bindPopup("<b>" + n + "</b>");
-                }
+            var f = L.geoJSON(data, {
+                style: { color: "#2ecc71", weight: 3, fillOpacity: 0.2 }
             }).addTo(map);
-            
-            map.fitBounds(camadaFazendas.getBounds());
-            document.getElementById('status').innerText = "FAZENDAS CARREGADAS";
+            map.fitBounds(f.getBounds());
         })
-        .catch(e => {
-            document.getElementById('status').innerText = "ERRO NO ARQUIVO JSON";
-            console.error("Erro no JSON:", e);
-        });
-
-    // Seletor de Camadas (No canto direito pra você testar qual aparece)
-    var overlays = {
-        "Nuvens (GOES-16 NASA)": nuvensNasa,
-        "Chuva Real (Radar REDEMET)": radarBrasil
-    };
-    L.control.layers({}, overlays, {collapsed: false}).addTo(map);
+        .catch(() => { console.log("Erro no JSON local"); });
 
 </script>
 </body>
