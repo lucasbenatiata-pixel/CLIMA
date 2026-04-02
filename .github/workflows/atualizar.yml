@@ -1,0 +1,22 @@
+name: Contrabando de Chuva
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Baixando Imagem
+        run: |
+          # Baixa a imagem do radar e salva como radar.png
+          curl -L "https://tilecache.rainviewer.com/v2/radar/nowcast_5/256/1/1/1/2/1_1.png" -o radar.png
+      - name: Upload pro GitHub
+        run: |
+          git config --global user.name 'Robo do Clima'
+          git config --global user.email 'bot@github.com'
+          git add radar.png
+          git commit -m "Chuva atualizada" || exit 0
+          git push
